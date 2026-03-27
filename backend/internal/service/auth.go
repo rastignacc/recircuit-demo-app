@@ -8,8 +8,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
-	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
-	"github.com/rastignacc/electronics-marketplace/backend/internal/repository"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/model"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 

@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/rastignacc/electronics-marketplace/backend/internal/middleware"
-	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
-	"github.com/rastignacc/electronics-marketplace/backend/internal/service"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/middleware"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/model"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/service"
 )
 
 type ProductHandler struct {

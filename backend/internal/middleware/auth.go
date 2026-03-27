@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
-	"github.com/rastignacc/electronics-marketplace/backend/internal/service"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/model"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/service"
 )
 
 type ctxKeyUser struct{}

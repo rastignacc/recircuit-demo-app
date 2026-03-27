@@ -16,12 +16,12 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/rastignacc/electronics-marketplace/backend/internal/config"
-	"github.com/rastignacc/electronics-marketplace/backend/internal/handler"
-	"github.com/rastignacc/electronics-marketplace/backend/internal/middleware"
-	"github.com/rastignacc/electronics-marketplace/backend/internal/repository"
-	"github.com/rastignacc/electronics-marketplace/backend/internal/seed"
-	"github.com/rastignacc/electronics-marketplace/backend/internal/service"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/config"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/handler"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/middleware"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/repository"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/seed"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/service"
 )
 
 func main() {

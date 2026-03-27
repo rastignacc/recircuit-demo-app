@@ -1,4 +1,4 @@
-# Electronics Marketplace
+# ReCircuit
 
 A full-stack refurbished electronics marketplace built with **Go** (backend) and **Vue 3** (frontend). Browse, buy, and sell refurbished phones, laptops, and tablets.
 
@@ -73,7 +73,7 @@ npm run dev
 ## Project Structure
 
 ```
-electronics-marketplace/
+recircuit-demo-app/
 ├── backend/           # Go REST API
 │   ├── cmd/server/    # Entry point
 │   ├── internal/      # App code (config, model, repository, service, handler, middleware)

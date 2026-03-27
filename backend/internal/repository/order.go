@@ -6,7 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/model"
 )
 
 type OrderRepository interface {

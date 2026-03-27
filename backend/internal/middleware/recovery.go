@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/model"
 )
 
 func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {

@@ -1,4 +1,4 @@
-module github.com/rastignacc/electronics-marketplace/backend
+module github.com/rastignacc/recircuit-demo-app/backend
 
 go 1.22.0
 

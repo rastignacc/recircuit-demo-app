@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
+	"github.com/rastignacc/recircuit-demo-app/backend/internal/model"
 	"golang.org/x/time/rate"
 )
 

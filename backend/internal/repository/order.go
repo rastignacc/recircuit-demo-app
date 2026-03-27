@@ -6,7 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rmarko/electronics-marketplace/backend/internal/model"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
 )
 
 type OrderRepository interface {
@@ -15,8 +15,9 @@ type OrderRepository interface {
 	GetProductForUpdate(ctx context.Context, tx pgx.Tx, productID int) (price float64, stock int, err error)
 	DecrementStock(ctx context.Context, tx pgx.Tx, productID int, qty int) error
 	GetByID(ctx context.Context, id int) (*model.Order, error)
-	ListByBuyer(ctx context.Context, buyerID int) ([]model.Order, error)
-	ListBySeller(ctx context.Context, sellerID int) ([]model.Order, error)
+	HasSellerProduct(ctx context.Context, orderID, sellerID int) (bool, error)
+	ListByBuyer(ctx context.Context, buyerID, limit, offset int) ([]model.Order, error)
+	ListBySeller(ctx context.Context, sellerID, limit, offset int) ([]model.Order, error)
 	GetSellerStats(ctx context.Context, sellerID int) (*model.SellerStats, error)
 	BeginTx(ctx context.Context) (pgx.Tx, error)
 }
@@ -76,6 +77,19 @@ func (r *orderRepo) DecrementStock(ctx context.Context, tx pgx.Tx, productID int
 	return nil
 }
 
+func (r *orderRepo) HasSellerProduct(ctx context.Context, orderID, sellerID int) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS(
+			SELECT 1 FROM order_items oi
+			JOIN products p ON p.id = oi.product_id
+			WHERE oi.order_id = $1 AND p.seller_id = $2
+		)`,
+		orderID, sellerID,
+	).Scan(&exists)
+	return exists, err
+}
+
 func (r *orderRepo) GetByID(ctx context.Context, id int) (*model.Order, error) {
 	o := &model.Order{}
 	err := r.pool.QueryRow(ctx,
@@ -106,14 +120,18 @@ func (r *orderRepo) GetByID(ctx context.Context, id int) (*model.Order, error) {
 		}
 		o.Items = append(o.Items, item)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return o, nil
 }
 
-func (r *orderRepo) ListByBuyer(ctx context.Context, buyerID int) ([]model.Order, error) {
+func (r *orderRepo) ListByBuyer(ctx context.Context, buyerID, limit, offset int) ([]model.Order, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT id, buyer_id, status, total, created_at
-		 FROM orders WHERE buyer_id = $1 ORDER BY created_at DESC`,
-		buyerID,
+		 FROM orders WHERE buyer_id = $1 ORDER BY created_at DESC
+		 LIMIT $2 OFFSET $3`,
+		buyerID, limit, offset,
 	)
 	if err != nil {
 		return nil, err
@@ -128,18 +146,22 @@ func (r *orderRepo) ListByBuyer(ctx context.Context, buyerID int) ([]model.Order
 		}
 		orders = append(orders, o)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return orders, nil
 }
 
-func (r *orderRepo) ListBySeller(ctx context.Context, sellerID int) ([]model.Order, error) {
+func (r *orderRepo) ListBySeller(ctx context.Context, sellerID, limit, offset int) ([]model.Order, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT DISTINCT o.id, o.buyer_id, o.status, o.total, o.created_at
 		 FROM orders o
 		 JOIN order_items oi ON oi.order_id = o.id
 		 JOIN products p ON p.id = oi.product_id
 		 WHERE p.seller_id = $1
-		 ORDER BY o.created_at DESC`,
-		sellerID,
+		 ORDER BY o.created_at DESC
+		 LIMIT $2 OFFSET $3`,
+		sellerID, limit, offset,
 	)
 	if err != nil {
 		return nil, err
@@ -153,6 +175,9 @@ func (r *orderRepo) ListBySeller(ctx context.Context, sellerID int) ([]model.Ord
 			return nil, err
 		}
 		orders = append(orders, o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return orders, nil
 }
@@ -171,7 +196,8 @@ func (r *orderRepo) GetSellerStats(ctx context.Context, sellerID int) (*model.Se
 		`SELECT COALESCE(SUM(oi.quantity), 0), COALESCE(SUM(oi.quantity * oi.unit_price), 0)
 		 FROM order_items oi
 		 JOIN products p ON p.id = oi.product_id
-		 WHERE p.seller_id = $1`,
+		 JOIN orders o ON o.id = oi.order_id
+		 WHERE p.seller_id = $1 AND o.status != 'cancelled'`,
 		sellerID,
 	).Scan(&stats.TotalSold, &stats.TotalRevenue)
 	if err != nil {

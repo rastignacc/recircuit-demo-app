@@ -16,7 +16,7 @@ func Load() Config {
 	return Config{
 		Port:        envOrDefault("PORT", "8080"),
 		DatabaseURL: envOrDefault("DATABASE_URL", "postgres://marketplace:marketplace@localhost:5432/marketplace?sslmode=disable"),
-		JWTSecret:   envOrDefault("JWT_SECRET", "dev-secret-change-in-production"),
+		JWTSecret:   envOrDefault("JWT_SECRET", "not-a-real-secret"),
 		CORSOrigins: strings.Split(envOrDefault("CORS_ORIGINS", "http://localhost:5173"), ","),
 	}
 }

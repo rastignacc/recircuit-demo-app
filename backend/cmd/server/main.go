@@ -16,12 +16,12 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/rmarko/electronics-marketplace/backend/internal/config"
-	"github.com/rmarko/electronics-marketplace/backend/internal/handler"
-	"github.com/rmarko/electronics-marketplace/backend/internal/middleware"
-	"github.com/rmarko/electronics-marketplace/backend/internal/repository"
-	"github.com/rmarko/electronics-marketplace/backend/internal/seed"
-	"github.com/rmarko/electronics-marketplace/backend/internal/service"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/config"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/handler"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/middleware"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/repository"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/seed"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/service"
 )
 
 func main() {
@@ -72,16 +72,19 @@ func main() {
 
 	// Global middleware
 	r.Use(middleware.RequestID)
+	r.Use(middleware.MaxBodySize(1 << 20)) // 1 MB
 	r.Use(middleware.CORS(cfg.CORSOrigins))
 	r.Use(middleware.Logging(logger))
 	r.Use(middleware.Recovery(logger))
 
 	r.Get("/healthz", healthHandler.Check)
 
+	authRateLimit := middleware.RateLimit(5, 10)
+
 	r.Route("/api/v1", func(r chi.Router) {
-		// Public auth
-		r.Post("/register", authHandler.Register)
-		r.Post("/login", authHandler.Login)
+		// Public auth (rate-limited)
+		r.With(authRateLimit).Post("/register", authHandler.Register)
+		r.With(authRateLimit).Post("/login", authHandler.Login)
 
 		// Public product read
 		r.Get("/categories", productHandler.ListCategories)
@@ -92,6 +95,7 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireAuth(authSvc))
 
+			r.Post("/logout", authHandler.Logout)
 			r.Get("/orders", orderHandler.ListOrders)
 			r.Get("/orders/{id}", orderHandler.GetByID)
 
@@ -189,4 +193,3 @@ func runMigrations(databaseURL string, logger *slog.Logger) {
 	v, dirty, _ := m.Version()
 	logger.Info("migrations applied", slog.Uint64("version", uint64(v)), slog.Bool("dirty", dirty))
 }
-

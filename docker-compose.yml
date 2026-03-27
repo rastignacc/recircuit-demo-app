@@ -21,7 +21,7 @@ services:
       - "8080:8080"
     environment:
       DATABASE_URL: postgres://marketplace:marketplace@postgres:5432/marketplace?sslmode=disable
-      JWT_SECRET: dev-secret-change-in-production
+      JWT_SECRET: not-a-real-secret
       PORT: "8080"
       CORS_ORIGINS: http://localhost:5173
     depends_on:

@@ -3,12 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"net/mail"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
-	"github.com/rmarko/electronics-marketplace/backend/internal/model"
-	"github.com/rmarko/electronics-marketplace/backend/internal/repository"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -31,6 +32,9 @@ type Claims struct {
 func (s *AuthService) Register(ctx context.Context, req model.RegisterRequest) (*model.AuthResponse, error) {
 	if req.Email == "" || req.Password == "" || req.Name == "" {
 		return nil, model.ErrBadRequest("email, password, and name are required")
+	}
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		return nil, model.ErrBadRequest("invalid email format")
 	}
 	if req.Role != model.RoleBuyer && req.Role != model.RoleSeller {
 		return nil, model.ErrBadRequest("role must be 'buyer' or 'seller'")

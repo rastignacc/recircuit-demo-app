@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/rmarko/electronics-marketplace/backend/internal/middleware"
-	"github.com/rmarko/electronics-marketplace/backend/internal/model"
-	"github.com/rmarko/electronics-marketplace/backend/internal/service"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/middleware"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/service"
 )
 
 type OrderHandler struct {
@@ -54,8 +54,10 @@ func (h *OrderHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	user := middleware.GetUser(r.Context())
+	page := intQuery(r, "page", 1)
+	perPage := intQuery(r, "per_page", 20)
 
-	orders, err := h.orderSvc.ListOrders(r.Context(), user.UserID, user.Role)
+	orders, err := h.orderSvc.ListOrders(r.Context(), user.UserID, user.Role, page, perPage)
 	if err != nil {
 		model.WriteError(w, err)
 		return

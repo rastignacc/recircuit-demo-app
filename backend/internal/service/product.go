@@ -6,8 +6,8 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/rmarko/electronics-marketplace/backend/internal/model"
-	"github.com/rmarko/electronics-marketplace/backend/internal/repository"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/repository"
 )
 
 type ProductService struct {
@@ -27,6 +27,12 @@ func (s *ProductService) Create(ctx context.Context, sellerID int, req model.Cre
 	}
 	if req.Stock < 0 {
 		return nil, model.ErrBadRequest("stock cannot be negative")
+	}
+	if req.CategoryID <= 0 {
+		return nil, model.ErrBadRequest("valid category is required")
+	}
+	if !req.Condition.Valid() {
+		return nil, model.ErrBadRequest("condition must be one of: like_new, excellent, good, fair")
 	}
 	if req.Specs == nil {
 		req.Specs = json.RawMessage("{}")
@@ -62,7 +68,17 @@ func (s *ProductService) GetByID(ctx context.Context, id int) (*model.Product, e
 }
 
 func (s *ProductService) Update(ctx context.Context, id, sellerID int, req model.UpdateProductRequest) (*model.Product, error) {
-	existing, err := s.products.GetByID(ctx, id)
+	if req.Condition != nil && !req.Condition.Valid() {
+		return nil, model.ErrBadRequest("condition must be one of: like_new, excellent, good, fair")
+	}
+
+	tx, err := s.products.BeginTx(ctx)
+	if err != nil {
+		return nil, model.ErrInternal("failed to start transaction")
+	}
+	defer tx.Rollback(ctx)
+
+	existing, err := s.products.GetByIDForUpdate(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, model.ErrNotFound("product not found")
@@ -73,15 +89,25 @@ func (s *ProductService) Update(ctx context.Context, id, sellerID int, req model
 		return nil, model.ErrForbidden("you can only update your own products")
 	}
 
-	p, err := s.products.Update(ctx, id, req)
+	p, err := s.products.UpdateTx(ctx, tx, id, req)
 	if err != nil {
 		return nil, model.ErrInternal("failed to update product")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, model.ErrInternal("failed to commit transaction")
 	}
 	return p, nil
 }
 
 func (s *ProductService) Delete(ctx context.Context, id, sellerID int) error {
-	existing, err := s.products.GetByID(ctx, id)
+	tx, err := s.products.BeginTx(ctx)
+	if err != nil {
+		return model.ErrInternal("failed to start transaction")
+	}
+	defer tx.Rollback(ctx)
+
+	existing, err := s.products.GetByIDForUpdate(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.ErrNotFound("product not found")
@@ -92,8 +118,20 @@ func (s *ProductService) Delete(ctx context.Context, id, sellerID int) error {
 		return model.ErrForbidden("you can only delete your own products")
 	}
 
-	if err := s.products.Delete(ctx, id); err != nil {
+	hasItems, err := s.products.HasOrderItems(ctx, id)
+	if err != nil {
+		return model.ErrInternal("failed to check order items")
+	}
+	if hasItems {
+		return model.ErrConflict("cannot delete product that has existing orders")
+	}
+
+	if err := s.products.DeleteTx(ctx, tx, id); err != nil {
 		return model.ErrInternal("failed to delete product")
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return model.ErrInternal("failed to commit transaction")
 	}
 	return nil
 }

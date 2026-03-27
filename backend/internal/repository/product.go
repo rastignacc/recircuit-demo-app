@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rmarko/electronics-marketplace/backend/internal/model"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
 )
 
 type ProductRepository interface {
@@ -16,6 +17,11 @@ type ProductRepository interface {
 	Delete(ctx context.Context, id int) error
 	List(ctx context.Context, filter model.ProductFilter) ([]model.Product, int, error)
 	ListCategories(ctx context.Context) ([]model.Category, error)
+	BeginTx(ctx context.Context) (pgx.Tx, error)
+	GetByIDForUpdate(ctx context.Context, tx pgx.Tx, id int) (*model.Product, error)
+	UpdateTx(ctx context.Context, tx pgx.Tx, id int, req model.UpdateProductRequest) (*model.Product, error)
+	DeleteTx(ctx context.Context, tx pgx.Tx, id int) error
+	HasOrderItems(ctx context.Context, productID int) (bool, error)
 }
 
 type productRepo struct {
@@ -142,6 +148,121 @@ func (r *productRepo) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
+func (r *productRepo) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return r.pool.Begin(ctx)
+}
+
+func (r *productRepo) GetByIDForUpdate(ctx context.Context, tx pgx.Tx, id int) (*model.Product, error) {
+	p := &model.Product{}
+	err := tx.QueryRow(ctx,
+		`SELECT id, seller_id, category_id, brand, model, condition,
+		        price, description, image_url, specs, stock,
+		        created_at, updated_at
+		 FROM products
+		 WHERE id = $1 FOR UPDATE`, id,
+	).Scan(
+		&p.ID, &p.SellerID, &p.CategoryID, &p.Brand, &p.Model, &p.Condition,
+		&p.Price, &p.Description, &p.ImageURL, &p.Specs, &p.Stock,
+		&p.CreatedAt, &p.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (r *productRepo) UpdateTx(ctx context.Context, tx pgx.Tx, id int, req model.UpdateProductRequest) (*model.Product, error) {
+	setClauses := []string{}
+	args := []any{}
+	argIdx := 1
+
+	if req.Brand != nil {
+		setClauses = append(setClauses, fmt.Sprintf("brand = $%d", argIdx))
+		args = append(args, *req.Brand)
+		argIdx++
+	}
+	if req.Model != nil {
+		setClauses = append(setClauses, fmt.Sprintf("model = $%d", argIdx))
+		args = append(args, *req.Model)
+		argIdx++
+	}
+	if req.Condition != nil {
+		setClauses = append(setClauses, fmt.Sprintf("condition = $%d", argIdx))
+		args = append(args, *req.Condition)
+		argIdx++
+	}
+	if req.Price != nil {
+		setClauses = append(setClauses, fmt.Sprintf("price = $%d", argIdx))
+		args = append(args, *req.Price)
+		argIdx++
+	}
+	if req.Description != nil {
+		setClauses = append(setClauses, fmt.Sprintf("description = $%d", argIdx))
+		args = append(args, *req.Description)
+		argIdx++
+	}
+	if req.ImageURL != nil {
+		setClauses = append(setClauses, fmt.Sprintf("image_url = $%d", argIdx))
+		args = append(args, *req.ImageURL)
+		argIdx++
+	}
+	if req.Specs != nil {
+		setClauses = append(setClauses, fmt.Sprintf("specs = $%d", argIdx))
+		args = append(args, *req.Specs)
+		argIdx++
+	}
+	if req.Stock != nil {
+		setClauses = append(setClauses, fmt.Sprintf("stock = $%d", argIdx))
+		args = append(args, *req.Stock)
+		argIdx++
+	}
+
+	if len(setClauses) == 0 {
+		return r.GetByIDForUpdate(ctx, tx, id)
+	}
+
+	setClauses = append(setClauses, "updated_at = NOW()")
+	args = append(args, id)
+
+	query := fmt.Sprintf(
+		`UPDATE products SET %s WHERE id = $%d
+		 RETURNING id, seller_id, category_id, brand, model, condition,
+		           price, description, image_url, specs, stock, created_at, updated_at`,
+		strings.Join(setClauses, ", "), argIdx,
+	)
+
+	p := &model.Product{}
+	err := tx.QueryRow(ctx, query, args...).Scan(
+		&p.ID, &p.SellerID, &p.CategoryID, &p.Brand, &p.Model, &p.Condition,
+		&p.Price, &p.Description, &p.ImageURL, &p.Specs, &p.Stock,
+		&p.CreatedAt, &p.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (r *productRepo) DeleteTx(ctx context.Context, tx pgx.Tx, id int) error {
+	tag, err := tx.Exec(ctx, `DELETE FROM products WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("product not found")
+	}
+	return nil
+}
+
+func (r *productRepo) HasOrderItems(ctx context.Context, productID int) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM order_items WHERE product_id = $1)`,
+		productID,
+	).Scan(&exists)
+	return exists, err
+}
+
 func (r *productRepo) List(ctx context.Context, filter model.ProductFilter) ([]model.Product, int, error) {
 	where := []string{}
 	args := []any{}
@@ -173,8 +294,8 @@ func (r *productRepo) List(ctx context.Context, filter model.ProductFilter) ([]m
 		argIdx++
 	}
 	if filter.Search != nil && *filter.Search != "" {
-		where = append(where, fmt.Sprintf("(LOWER(p.brand) LIKE LOWER($%d) OR LOWER(p.model) LIKE LOWER($%d) OR LOWER(p.description) LIKE LOWER($%d))", argIdx, argIdx, argIdx))
-		args = append(args, "%"+*filter.Search+"%")
+		where = append(where, fmt.Sprintf("(LOWER(p.brand) LIKE LOWER($%d) ESCAPE '\\' OR LOWER(p.model) LIKE LOWER($%d) ESCAPE '\\' OR LOWER(p.description) LIKE LOWER($%d) ESCAPE '\\')", argIdx, argIdx, argIdx))
+		args = append(args, "%"+escapeLike(*filter.Search)+"%")
 		argIdx++
 	}
 	if filter.SellerID != nil {
@@ -249,7 +370,17 @@ func (r *productRepo) List(ctx context.Context, filter model.ProductFilter) ([]m
 		}
 		products = append(products, p)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
 	return products, total, nil
+}
+
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
 }
 
 func (r *productRepo) ListCategories(ctx context.Context) ([]model.Category, error) {
@@ -266,6 +397,9 @@ func (r *productRepo) ListCategories(ctx context.Context) ([]model.Category, err
 			return nil, err
 		}
 		categories = append(categories, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return categories, nil
 }

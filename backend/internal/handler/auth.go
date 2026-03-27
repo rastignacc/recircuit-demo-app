@@ -3,9 +3,10 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
-	"github.com/rmarko/electronics-marketplace/backend/internal/model"
-	"github.com/rmarko/electronics-marketplace/backend/internal/service"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/service"
 )
 
 type AuthHandler struct {
@@ -29,6 +30,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setTokenCookie(w, resp.Token)
 	model.WriteJSON(w, http.StatusCreated, resp)
 }
 
@@ -45,5 +47,30 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setTokenCookie(w, resp.Token)
 	model.WriteJSON(w, http.StatusOK, resp)
+}
+
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
+	model.WriteJSON(w, http.StatusOK, map[string]string{"message": "logged out"})
+}
+
+func setTokenCookie(w http.ResponseWriter, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "token",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(24 * time.Hour / time.Second),
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
 }

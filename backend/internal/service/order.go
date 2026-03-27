@@ -4,11 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
-
 	"github.com/jackc/pgx/v5"
-	"github.com/rmarko/electronics-marketplace/backend/internal/model"
-	"github.com/rmarko/electronics-marketplace/backend/internal/repository"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/repository"
 )
 
 type OrderService struct {
@@ -35,7 +33,7 @@ func (s *OrderService) PlaceOrder(ctx context.Context, buyerID int, req model.Cr
 	}
 	defer tx.Rollback(ctx)
 
-	var total float64
+	var totalCents int64
 	items := make([]model.OrderItem, len(req.Items))
 
 	for i, reqItem := range req.Items {
@@ -59,10 +57,10 @@ func (s *OrderService) PlaceOrder(ctx context.Context, buyerID int, req model.Cr
 			Quantity:  reqItem.Quantity,
 			UnitPrice: price,
 		}
-		total += price * float64(reqItem.Quantity)
+		totalCents += int64(price*100) * int64(reqItem.Quantity)
 	}
 
-	total = math.Round(total*100) / 100
+	total := float64(totalCents) / 100
 
 	order := &model.Order{
 		BuyerID: buyerID,
@@ -100,17 +98,34 @@ func (s *OrderService) GetByID(ctx context.Context, orderID, userID int, role mo
 	if role == model.RoleBuyer && order.BuyerID != userID {
 		return nil, model.ErrForbidden("you can only view your own orders")
 	}
+	if role == model.RoleSeller {
+		has, err := s.orders.HasSellerProduct(ctx, orderID, userID)
+		if err != nil {
+			return nil, model.ErrInternal("failed to check order ownership")
+		}
+		if !has {
+			return nil, model.ErrForbidden("you can only view orders containing your products")
+		}
+	}
 	return order, nil
 }
 
-func (s *OrderService) ListOrders(ctx context.Context, userID int, role model.Role) ([]model.Order, error) {
+func (s *OrderService) ListOrders(ctx context.Context, userID int, role model.Role, page, perPage int) ([]model.Order, error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 || perPage > 100 {
+		perPage = 20
+	}
+	offset := (page - 1) * perPage
+
 	var orders []model.Order
 	var err error
 
 	if role == model.RoleSeller {
-		orders, err = s.orders.ListBySeller(ctx, userID)
+		orders, err = s.orders.ListBySeller(ctx, userID, perPage, offset)
 	} else {
-		orders, err = s.orders.ListByBuyer(ctx, userID)
+		orders, err = s.orders.ListByBuyer(ctx, userID, perPage, offset)
 	}
 
 	if err != nil {

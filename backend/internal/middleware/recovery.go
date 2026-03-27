@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"github.com/rmarko/electronics-marketplace/backend/internal/model"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
 )
 
 func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {

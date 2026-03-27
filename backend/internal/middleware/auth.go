@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rmarko/electronics-marketplace/backend/internal/model"
-	"github.com/rmarko/electronics-marketplace/backend/internal/service"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/model"
+	"github.com/rastignacc/electronics-marketplace/backend/internal/service"
 )
 
 type ctxKeyUser struct{}
@@ -25,21 +25,30 @@ func GetUser(ctx context.Context) *AuthUser {
 }
 
 // RequireAuth rejects requests without a valid JWT.
+// It checks the "token" HttpOnly cookie first, then falls back to the
+// Authorization: Bearer header for API consumers.
 func RequireAuth(authSvc *service.AuthService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			header := r.Header.Get("Authorization")
-			if header == "" {
-				model.WriteError(w, model.ErrUnauthorized("missing authorization header"))
-				return
+			tokenStr := ""
+			if c, err := r.Cookie("token"); err == nil && c.Value != "" {
+				tokenStr = c.Value
 			}
-			parts := strings.SplitN(header, " ", 2)
-			if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
-				model.WriteError(w, model.ErrUnauthorized("invalid authorization format"))
-				return
+			if tokenStr == "" {
+				header := r.Header.Get("Authorization")
+				if header == "" {
+					model.WriteError(w, model.ErrUnauthorized("missing authorization"))
+					return
+				}
+				parts := strings.SplitN(header, " ", 2)
+				if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
+					model.WriteError(w, model.ErrUnauthorized("invalid authorization format"))
+					return
+				}
+				tokenStr = parts[1]
 			}
 
-			claims, err := authSvc.ValidateToken(parts[1])
+			claims, err := authSvc.ValidateToken(tokenStr)
 			if err != nil {
 				model.WriteError(w, err)
 				return

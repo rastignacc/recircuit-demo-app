@@ -10,8 +10,8 @@ const router = useRouter()
 
 const cartCount = computed(() => cart.totalItems)
 
-function logout() {
-  auth.logout()
+async function logout() {
+  await auth.logout()
   cart.clear()
   router.push('/')
 }

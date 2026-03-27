@@ -14,20 +14,28 @@ const (
 	ConditionFair      Condition = "fair"
 )
 
+func (c Condition) Valid() bool {
+	switch c {
+	case ConditionLikeNew, ConditionExcellent, ConditionGood, ConditionFair:
+		return true
+	}
+	return false
+}
+
 type Product struct {
-	ID          int              `json:"id"`
-	SellerID    int              `json:"seller_id"`
-	CategoryID  int              `json:"category_id"`
-	Brand       string           `json:"brand"`
-	Model       string           `json:"model"`
-	Condition   Condition        `json:"condition"`
-	Price       float64          `json:"price"`
-	Description string           `json:"description"`
-	ImageURL    string           `json:"image_url"`
-	Specs       json.RawMessage  `json:"specs"`
-	Stock       int              `json:"stock"`
-	CreatedAt   time.Time        `json:"created_at"`
-	UpdatedAt   time.Time        `json:"updated_at"`
+	ID          int             `json:"id"`
+	SellerID    int             `json:"seller_id"`
+	CategoryID  int             `json:"category_id"`
+	Brand       string          `json:"brand"`
+	Model       string          `json:"model"`
+	Condition   Condition       `json:"condition"`
+	Price       float64         `json:"price"`
+	Description string          `json:"description"`
+	ImageURL    string          `json:"image_url"`
+	Specs       json.RawMessage `json:"specs"`
+	Stock       int             `json:"stock"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 
 	// Joined fields
 	CategoryName string `json:"category_name,omitempty"`

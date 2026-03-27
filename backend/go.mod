@@ -1,4 +1,4 @@
-module github.com/rmarko/electronics-marketplace/backend
+module github.com/rastignacc/electronics-marketplace/backend
 
 go 1.22.0
 
@@ -8,6 +8,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.18.1
 	github.com/jackc/pgx/v5 v5.7.1
 	golang.org/x/crypto v0.28.0
+	golang.org/x/time v0.7.0
 )
 
 require (

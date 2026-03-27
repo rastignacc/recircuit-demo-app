@@ -14,21 +14,13 @@ import type {
 const api = axios.create({
   baseURL: '/api/v1',
   headers: { 'Content-Type': 'application/json' },
-})
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
+  withCredentials: true,
 })
 
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      localStorage.removeItem('token')
       localStorage.removeItem('user')
       if (window.location.pathname !== '/login') {
         window.location.href = '/login'
@@ -44,6 +36,9 @@ export const authApi = {
   },
   login(email: string, password: string) {
     return api.post<AuthResponse>('/login', { email, password })
+  },
+  logout() {
+    return api.post('/logout')
   },
 }
 

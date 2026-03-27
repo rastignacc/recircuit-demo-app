@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
